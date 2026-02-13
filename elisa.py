@@ -30,8 +30,8 @@ nx = 81
 ny = 81
 
 # Limits for the convergence surface axes
-M_limit = 50
-N_limit = 50
+M_limit = 20
+N_limit = 20
 
 # Convergence tolerance (e.g. 1e-3 = 0.1%)
 rel_tol = 1e-7
