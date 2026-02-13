@@ -141,3 +141,5 @@ plt.title(r"von Mises stress on top surface (Navier)")
 plt.legend()
 plt.tight_layout()
 plt.show()
+
+
