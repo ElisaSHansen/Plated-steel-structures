@@ -34,7 +34,7 @@ M_limit = 20
 N_limit = 20
 
 # Convergence tolerance (e.g. 1e-3 = 0.1%)
-rel_tol = 1e-7
+rel_tol = 1e-4
 
 # -----------------------------
 # 2) Plate theory
