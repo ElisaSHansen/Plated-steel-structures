@@ -202,21 +202,33 @@ plt.show()
 # -----------------------------
 # 8) Return values (as variables)
 # -----------------------------
-# You can use these in the rest of your script/report:
-#   Mconv, Nconv, w_ref
 
 
 # ============================================================
-# Stress from Navier deflection using DIRECT stress formulas:
-#   sigma1 = -(E*z/(1-nu^2)) (w_x1x1 + nu*w_x2x2)
-#   sigma2 = -(E*z/(1-nu^2)) (w_x2x2 + nu*w_x1x1)
-#   tau12  = -2*G*z*w_x1x2,  G = E/(2(1+nu))
+# Simply supported rectangular plate, uniform pressure load
+# Navier series solution (odd-odd terms for uniform load)
 #
-# Using Mconv=19, Nconv=5 (as requested)
+# Deflection:
+#   w(x1,x2) = sum_{m=1..M} sum_{n=1..N} Wmn sin(mπx1/a) sin(nπx2/b)
+#
+# Wmn = Pmn / (D π^4 ((m/a)^2 + (n/b)^2)^2)
+# Pmn = 16 p0 / (π^2 m n)   for m,n odd, else 0
+#
+# Stresses (top surface z=t/2) from curvatures:
+#   sigma1 = -(E z/(1-ν^2)) (w_x1x1 + ν w_x2x2)
+#   sigma2 = -(E z/(1-ν^2)) (w_x2x2 + ν w_x1x1)
+#   tau12  = -(2 G z) w_x1x2
+#   von Mises = sqrt(s1^2 - s1*s2 + s2^2 + 3*t12^2)
+#
+# This script:
+#  1) Builds convergence surface for max von Mises vs (M,N)
+#  2) Finds first (M,N) meeting rel_tol vs reference at (M_limit,N_limit)
+#  3) Prints max stresses (direct, shear, von Mises) + locations
+#  4) Plots convergence surface and final von Mises contour (only plots required)
 # ============================================================
 
 # -----------------------------
-# 1) Inputs (Project A.4)
+# 1) Inputs
 # -----------------------------
 p0 = 10e3          # N/m^2
 a  = 2.8           # m
@@ -226,128 +238,218 @@ E  = 210e9         # Pa
 nu = 0.30          # -
 G  = E/(2*(1+nu))  # Pa
 
-Mconv = 19
-Nconv = 5
+# top surface coordinate
+z = t / 2.0
 
-# Grid for evaluating stresses
-nx = 121
-ny = 121
+# Grid used to evaluate maxima over the plate
+nx = 81
+ny = 81
 
-# Top surface coordinate (x3 = z)
-z = t/2
+# Convergence surface limits (moderate -> speed)
+M_limit = 50
+N_limit = 50
+
+# Convergence tolerance (relative error vs reference)
+rel_tol = 1e-4
 
 # -----------------------------
-# 2) Navier coefficients
+# 2) Navier helpers
 # -----------------------------
-def plate_rigidity(E, nu, t):
-    return E * t**3 / (12.0 * (1.0 - nu**2))
+def plate_rigidity(E_, nu_, t_):
+    return E_ * t_**3 / (12.0 * (1.0 - nu_**2))
 
-def Pmn_uniform(p0, m, n):
-    # uniform load => only odd-odd terms are non-zero
+def Pmn_uniform(p0_, m, n):
+    # Uniform load -> only odd-odd contribute
     if (m % 2 == 0) or (n % 2 == 0):
         return 0.0
-    return 16.0 * p0 / (np.pi**2 * m * n)
+    return 16.0 * p0_ / (np.pi**2 * m * n)
 
-def Wmn(Pmn, D, a, b, m, n):
-    return Pmn / (D * np.pi**4 * ((m/a)**2 + (n/b)**2)**2)
+def Wmn_from_Pmn(Pmn_, D_, a_, b_, m, n):
+    return Pmn_ / (D_ * np.pi**4 * ((m/a_)**2 + (n/b_)**2)**2)
 
 # -----------------------------
-# 3) Compute second derivatives of w on a grid
+# 3) Field computation (w-derivatives -> stresses -> von Mises)
 # -----------------------------
-def w_second_derivatives_grid(a, b, p0, E, nu, t, Mmax, Nmax, nx=121, ny=121):
+def compute_stress_fields(Mmax, Nmax, nx_, ny_):
     """
-    Returns x1, x2 arrays and fields:
-      w_x1x1, w_x2x2, w_x1x2   (ny x nx)
-    computed from Navier series.
+    Compute curvature derivatives and stresses on a (ny_ x nx_) grid.
+    Returns x1, x2, sigma1, sigma2, tau12, svm
     """
     D = plate_rigidity(E, nu, t)
+    x1 = np.linspace(0.0, a, nx_)
+    x2 = np.linspace(0.0, b, ny_)
 
-    x1 = np.linspace(0.0, a, nx)
-    x2 = np.linspace(0.0, b, ny)
+    # second derivatives of w
+    w_x1x1 = np.zeros((ny_, nx_))
+    w_x2x2 = np.zeros((ny_, nx_))
+    w_x1x2 = np.zeros((ny_, nx_))
 
-    w_x1x1 = np.zeros((ny, nx))
-    w_x2x2 = np.zeros((ny, nx))
-    w_x1x2 = np.zeros((ny, nx))
+    # precompute trig
+    sin_mx1 = {m: np.sin(m*np.pi*x1/a) for m in range(1, Mmax+1)}
+    cos_mx1 = {m: np.cos(m*np.pi*x1/a) for m in range(1, Mmax+1)}
+    sin_nx2 = {n: np.sin(n*np.pi*x2/b) for n in range(1, Nmax+1)}
+    cos_nx2 = {n: np.cos(n*np.pi*x2/b) for n in range(1, Nmax+1)}
 
-    # Precompute trig arrays
-    sin_mx1, cos_mx1 = {}, {}
-    for m in range(1, Mmax + 1):
-        sin_mx1[m] = np.sin(m*np.pi*x1/a)
-        cos_mx1[m] = np.cos(m*np.pi*x1/a)
-
-    sin_nx2, cos_nx2 = {}, {}
-    for n in range(1, Nmax + 1):
-        sin_nx2[n] = np.sin(n*np.pi*x2/b)
-        cos_nx2[n] = np.cos(n*np.pi*x2/b)
-
-    for m in range(1, Mmax + 1):
-        for n in range(1, Nmax + 1):
+    for m in range(1, Mmax+1):
+        for n in range(1, Nmax+1):
             P = Pmn_uniform(p0, m, n)
             if P == 0.0:
                 continue
-            W = Wmn(P, D, a, b, m, n)
+            W = Wmn_from_Pmn(P, D, a, b, m, n)
 
-            S = np.outer(sin_nx2[n], sin_mx1[m])  # sin(y)*sin(x)
-            C = np.outer(cos_nx2[n], cos_mx1[m])  # cos(y)*cos(x)
+            S = np.outer(sin_nx2[n], sin_mx1[m])  # sin(nπx2/b)*sin(mπx1/a)
+            C = np.outer(cos_nx2[n], cos_mx1[m])  # cos(nπx2/b)*cos(mπx1/a)
 
-            # Second derivatives of the sine shape:
             w_x1x1 += W * (-(m*np.pi/a)**2) * S
             w_x2x2 += W * (-(n*np.pi/b)**2) * S
             w_x1x2 += W * ((m*np.pi/a)*(n*np.pi/b)) * C
 
-    return x1, x2, w_x1x1, w_x2x2, w_x1x2
+    sigma1 = -(E*z/(1.0 - nu**2)) * (w_x1x1 + nu*w_x2x2)
+    sigma2 = -(E*z/(1.0 - nu**2)) * (w_x2x2 + nu*w_x1x1)
+    tau12  = -(2.0*G*z) * w_x1x2
+
+    svm = np.sqrt(sigma1**2 - sigma1*sigma2 + sigma2**2 + 3.0*tau12**2)
+    return x1, x2, sigma1, sigma2, tau12, svm
+
+def max_von_mises(Mmax, Nmax):
+    _, _, _, _, _, svm = compute_stress_fields(Mmax, Nmax, nx, ny)
+    return float(np.max(svm))
+
+def max_stresses_with_locations(Mmax, Nmax):
+    """
+    Returns maxima (absolute) of sigma1, sigma2, tau12 and max von Mises + locations.
+    Location is based on the discrete evaluation grid (nx, ny).
+    """
+    x1, x2, sigma1, sigma2, tau12, svm = compute_stress_fields(Mmax, Nmax, nx, ny)
+
+    idx_s1  = np.unravel_index(np.argmax(np.abs(sigma1)), sigma1.shape)
+    idx_s2  = np.unravel_index(np.argmax(np.abs(sigma2)), sigma2.shape)
+    idx_t12 = np.unravel_index(np.argmax(np.abs(tau12)),  tau12.shape)
+    idx_vm  = np.unravel_index(np.argmax(svm),            svm.shape)  # svm >= 0
+
+    out = {
+        "sigma1_max_abs": float(np.abs(sigma1[idx_s1])),
+        "sigma2_max_abs": float(np.abs(sigma2[idx_s2])),
+        "tau12_max_abs":  float(np.abs(tau12[idx_t12])),
+        "svm_max":        float(svm[idx_vm]),
+
+        "sigma1_val": float(sigma1[idx_s1]),
+        "sigma2_val": float(sigma2[idx_s2]),
+        "tau12_val":  float(tau12[idx_t12]),
+
+        "sigma1_loc": (float(x1[idx_s1[1]]),  float(x2[idx_s1[0]])),
+        "sigma2_loc": (float(x1[idx_s2[1]]),  float(x2[idx_s2[0]])),
+        "tau12_loc":  (float(x1[idx_t12[1]]), float(x2[idx_t12[0]])),
+        "svm_loc":    (float(x1[idx_vm[1]]),  float(x2[idx_vm[0]])),
+    }
+    return out
 
 # -----------------------------
-# 4) Stress fields from the provided formulas
+# 4) Build convergence surface for max von Mises
 # -----------------------------
-x1, x2, w_x1x1, w_x2x2, w_x1x2 = w_second_derivatives_grid(
-    a, b, p0, E, nu, t, Mconv, Nconv, nx=nx, ny=ny
-)
+print("Computing convergence surface for max von Mises...")
+SVMsurf = np.zeros((N_limit, M_limit))
 
-# Direct stress formulas (your screenshot)
-sigma1 = -(E*z/(1-nu**2)) * (w_x1x1 + nu*w_x2x2)
-sigma2 = -(E*z/(1-nu**2)) * (w_x2x2 + nu*w_x1x1)
-tau12  = -(2*G*z)         * (w_x1x2)
+for Mmax in range(1, M_limit+1):
+    for Nmax in range(1, N_limit+1):
+        SVMsurf[Nmax-1, Mmax-1] = max_von_mises(Mmax, Nmax)
 
-# von Mises (plane stress)
-sigma_vm = np.sqrt(sigma1**2 - sigma1*sigma2 + sigma2**2 + 3*tau12**2)
+svm_ref = SVMsurf[N_limit-1, M_limit-1]
+Err = np.abs(SVMsurf - svm_ref) / (abs(svm_ref) if abs(svm_ref) > 0 else 1.0)
+
+# Find first (M,N) meeting tolerance using budget k=max(M,N)
+Mconv = None
+Nconv = None
+for k in range(1, max(M_limit, N_limit)+1):
+    candidates = []
+
+    # candidates where N=k
+    for M in range(1, min(M_limit, k)+1):
+        N = k
+        if N <= N_limit and Err[N-1, M-1] <= rel_tol:
+            candidates.append((M, N))
+
+    # candidates where M=k
+    for N in range(1, min(N_limit, k)+1):
+        M = k
+        if M <= M_limit and Err[N-1, M-1] <= rel_tol:
+            candidates.append((M, N))
+
+    if candidates:
+        # choose smallest (M+N), then M, then N
+        Mconv, Nconv = min(candidates, key=lambda tup: (tup[0] + tup[1], tup[0], tup[1]))
+        break
+
+print("\n===== Stress convergence (max von Mises) =====")
+print(f"Reference max von Mises at (M_limit,N_limit)=({M_limit},{N_limit}) = {svm_ref/1e6:.3f} MPa")
+if Mconv is None:
+    print(f"NOT converged for rel_tol={rel_tol} within limits.")
+else:
+    print(f"rel_tol = {rel_tol}")
+    print(f"Converged at: Mconv = {Mconv}, Nconv = {Nconv}")
+    print(f"max von Mises at (Mconv,Nconv) = {SVMsurf[Nconv-1, Mconv-1]/1e6:.3f} MPa")
+    print(f"relative error = {Err[Nconv-1, Mconv-1]:.3e}")
 
 # -----------------------------
-# 5) Find maxima + locations
+# 5) 3D plot of convergence surface + marker
 # -----------------------------
-def max_abs_with_location(field, x1, x2):
-    iy, ix = np.unravel_index(np.argmax(np.abs(field)), field.shape)
-    return field[iy, ix], x1[ix], x2[iy]
+M_vals = np.arange(1, M_limit+1)
+N_vals = np.arange(1, N_limit+1)
+M_mesh, N_mesh = np.meshgrid(M_vals, N_vals)
 
-def max_with_location(field, x1, x2):
-    iy, ix = np.unravel_index(np.argmax(field), field.shape)
-    return field[iy, ix], x1[ix], x2[iy]
+fig = plt.figure(figsize=(10, 6))
+ax = fig.add_subplot(111, projection="3d")
+surf = ax.plot_surface(M_mesh, N_mesh, SVMsurf/1e6, cmap="plasma", edgecolor="k", linewidth=0.2)
 
-s1_max, x_s1, y_s1 = max_abs_with_location(sigma1, x1, x2)
-s2_max, x_s2, y_s2 = max_abs_with_location(sigma2, x1, x2)
-t12_max, x_t12, y_t12 = max_abs_with_location(tau12, x1, x2)
-svm_max, x_vm, y_vm = max_with_location(sigma_vm, x1, x2)
+cbar = fig.colorbar(surf, shrink=0.65, aspect=12)
+cbar.set_label("max von Mises [MPa]")
 
-print("\n=== TOP SURFACE MAXIMA (Direct stress formulas) ===")
-print(f"Mmax={Mconv}, Nmax={Nconv}")
-print(f"Max |sigma1| = {abs(s1_max)/1e6:.3f} MPa at x1={x_s1:.3f} m, x2={y_s1:.3f} m")
-print(f"Max |sigma2| = {abs(s2_max)/1e6:.3f} MPa at x1={x_s2:.3f} m, x2={y_s2:.3f} m")
-print(f"Max |tau12|  = {abs(t12_max)/1e6:.3f} MPa at x1={x_t12:.3f} m, x2={y_t12:.3f} m")
-print(f"Max von Mises= {svm_max/1e6:.3f} MPa at x1={x_vm:.3f} m, x2={y_vm:.3f} m")
+ax.set_xlabel("Mmax")
+ax.set_ylabel("Nmax")
+ax.set_zlabel("max von Mises [MPa]")
+ax.set_title(f"Convergence surface of max von Mises (rel_tol={rel_tol:g})")
+ax.view_init(elev=28, azim=225)
+
+if Mconv is not None:
+    ax.scatter(Mconv, Nconv, SVMsurf[Nconv-1, Mconv-1]/1e6, s=120, color="red", edgecolors="black")
+
+plt.tight_layout()
+plt.show()
 
 # -----------------------------
-# 6) Plot von Mises (MPa)
+# 6) Choose final truncation for plotting + print max stresses
 # -----------------------------
+M_use = Mconv if Mconv is not None else M_limit
+N_use = Nconv if Nconv is not None else N_limit
+
+res = max_stresses_with_locations(M_use, N_use)
+
+print("\n===== Maximum stresses (top surface, based on grid) =====")
+print(f"(M,N)=({M_use},{N_use}), p0={p0/1e3:.1f} kN/m^2, z=t/2={z:.6f} m\n")
+
+print(f"max |sigma1| = {res['sigma1_max_abs']/1e6:.3f} MPa  "
+      f"(value={res['sigma1_val']/1e6:.3f} MPa) at (x1,x2)=({res['sigma1_loc'][0]:.4f}, {res['sigma1_loc'][1]:.4f}) m")
+
+print(f"max |sigma2| = {res['sigma2_max_abs']/1e6:.3f} MPa  "
+      f"(value={res['sigma2_val']/1e6:.3f} MPa) at (x1,x2)=({res['sigma2_loc'][0]:.4f}, {res['sigma2_loc'][1]:.4f}) m")
+
+print(f"max |tau12|  = {res['tau12_max_abs']/1e6:.3f} MPa  "
+      f"(value={res['tau12_val']/1e6:.3f} MPa) at (x1,x2)=({res['tau12_loc'][0]:.4f}, {res['tau12_loc'][1]:.4f}) m")
+
+print(f"max von Mises = {res['svm_max']/1e6:.3f} MPa at (x1,x2)=({res['svm_loc'][0]:.4f}, {res['svm_loc'][1]:.4f}) m")
+
+# -----------------------------
+# 7) Final contour plot of von Mises (only required plot)
+# -----------------------------
+x1, x2, sigma1, sigma2, tau12, svm = compute_stress_fields(M_use, N_use, nx, ny)
 X1, X2 = np.meshgrid(x1, x2)
 
 plt.figure(figsize=(8, 5))
-cs = plt.contourf(X1, X2, sigma_vm/1e6, levels=40)
-plt.colorbar(cs, label="von Mises stress [MPa]")
-plt.scatter([x_vm], [y_vm], marker="x", s=80, color="black", label="Max von Mises")
+cs = plt.contourf(X1, X2, svm/1e6, levels=40)
+plt.colorbar(cs, label="von Mises [MPa]")
 plt.xlabel(r"$x_1$ [m]")
 plt.ylabel(r"$x_2$ [m]")
-plt.title(r"von Mises stress on top surface (Direct formulas, Navier)")
-plt.legend()
+plt.title(f"von Mises on top surface using (M,N)=({M_use},{N_use})")
 plt.tight_layout()
 plt.show()
 
