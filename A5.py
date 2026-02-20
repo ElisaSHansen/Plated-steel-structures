@@ -17,9 +17,9 @@ nu = 3 / 10
 xi1 = a / 2
 xi2 = b / 2
 
-M_max = 20
-N_max = 20
-tol = 1e-4
+M_max = 20 #endre m_max og N_max til høyere grense ved spenningsberegning 
+N_max = 20 
+tol = 1e-4 #endre til 1e-7 ved spenningsberegning 
 
 nx = 81
 ny = 81
