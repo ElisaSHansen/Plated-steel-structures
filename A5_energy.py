@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # ============================================================
-# Project A.5 – Energy method (Rayleigh–Ritz) for a "concentrated" load
+# Project A.5 – Energy method (Rayleigh–Ritz) for a patch load
 # Load: Total force P_total = 20 kN uniformly distributed over a patch
 #       200 mm x 250 mm at the CENTER of the plate.
 #
@@ -10,15 +10,16 @@ import matplotlib.pyplot as plt
 #
 # Boundary condition cases:
 #   1) SSSS  (simply supported on all edges)
-#   2) CCSS  (more appropriate: clamped on x1=0,a ; simply supported on x2=0,b)
+#   2) CCSS  (clamped on x1=0,a ; simply supported on x2=0,b)
 #
 # Outputs:
 #   - w(center)
 #   - max |sigma1|, max |sigma2|, max |tau12|, max von Mises (top surface)
-#   - ONLY plots: deflection and von Mises (for both BC cases)
+#   - ONLY plots: deflection contours and von Mises contours (both BC cases)
+#   - EXTRA: von Mises contour for CCSS styled like example (black X at max + legend)
 #
 # IMPORTANT: Patch load integration is done on the PATCH interval directly
-#            (not by masking global Gauss points) to guarantee total load = 20 kN.
+#            to guarantee total load = 20 kN.
 # ============================================================
 
 # -----------------------------
@@ -47,12 +48,11 @@ x1c, x2c = a/2.0, b/2.0
 xL1, xL2 = x1c - patch_x/2.0, x1c + patch_x/2.0
 yL1, yL2 = x2c - patch_y/2.0, x2c + patch_y/2.0
 
-# Truncation (start moderate; increase if needed)
+# Truncation
 M = 20
 N = 20
 
 # Quadrature for ENERGY integrals over whole plate
-# Rule of thumb: >= 2*M and 2*N; for stresses, 3x is safer
 nqx = max(60, 3*M)
 nqy = max(60, 3*N)
 
@@ -66,7 +66,6 @@ ny = 201
 xg = np.linspace(0.0, a, nx)
 yg = np.linspace(0.0, b, ny)
 Xg, Yg = np.meshgrid(xg, yg)
-
 
 # ============================================================
 # 2) Basis functions (Rayleigh–Ritz)
@@ -100,7 +99,6 @@ def basis_CC_d2(k, L, x):
     term2 = (k*np.pi/L) * ((np.pi/L)*c1*ck + s1*(-k*np.pi/L)*sk)
     return term1 + term2
 
-
 # ============================================================
 # 3) Quadrature utilities
 # ============================================================
@@ -114,22 +112,13 @@ def gauss_interval(n, x1, x2):
 def gauss_on_0L(n, L):
     return gauss_interval(n, 0.0, L)
 
+def int_mat(A, B, w):
+    return (A * w) @ B.T
 
 # ============================================================
 # 4) Rayleigh–Ritz solver with PATCH LOAD
 # ============================================================
 def ritz_solve_patch(M, N, bc_x1="SS", bc_x2="SS"):
-    """
-    Solve for Wmn in:
-      w(x1,x2)=sum_m sum_n Wmn X_m1(x1) X_n2(x2)
-    using:
-      U = 0.5 D ∬ [ w_xx^2 + w_yy^2 + 2ν w_xx w_yy + 2(1-ν) w_xy^2 ] dA
-      V = ∬_{patch} p0 w dA
-
-    Returns:
-      W (MxN), basis_info
-    """
-
     # Choose basis per direction
     if bc_x1 == "SS":
         f0x, f1x, f2x = basis_SS, basis_SS_d1, basis_SS_d2
@@ -162,10 +151,6 @@ def ritz_solve_patch(M, N, bc_x1="SS", bc_x2="SS"):
         Y1[n-1,:] = f1y(n, b, yq)
         Y2[n-1,:] = f2y(n, b, yq)
 
-    def int_mat(A, B, w):
-        # A: (K,nq), B: (K,nq), w: (nq,)
-        return (A * w) @ B.T
-
     # 1D integral matrices
     Ix_00 = int_mat(X0, X0, wx)
     Ix_11 = int_mat(X1, X1, wx)
@@ -179,7 +164,7 @@ def ritz_solve_patch(M, N, bc_x1="SS", bc_x2="SS"):
     Iy_02 = Iy_20.T
     Iy_22 = int_mat(Y2, Y2, wy)
 
-    # ---- Patch quadrature for load vector (EXACT interval integration) ----
+    # ---- Patch quadrature for load vector ----
     xqp, wxp = gauss_interval(nq_patch_x, xL1, xL2)
     yqp, wyp = gauss_interval(nq_patch_y, yL1, yL2)
 
@@ -195,7 +180,6 @@ def ritz_solve_patch(M, N, bc_x1="SS", bc_x2="SS"):
     Iy_patch = (Y0p * wyp).sum(axis=1)  # ∫_{yL1}^{yL2} Y_n dy
 
     # Quick sanity check: total load recovered by quadrature should be ~ P_total
-    # (Only works exactly if w=1; here just check patch area)
     A_patch_num = wxp.sum() * wyp.sum()
     P_num = p0 * A_patch_num
     print(f"[Check] Patch area exact={A_patch:.6f} m^2, numeric={A_patch_num:.6f} m^2")
@@ -207,10 +191,8 @@ def ritz_solve_patch(M, N, bc_x1="SS", bc_x2="SS"):
     B = np.zeros(ndof)
 
     def idx(m, n):
-        return m*N + n  # m=0..M-1, n=0..N-1
+        return m*N + n
 
-    # Bending bilinear form:
-    # A_ij = D ∬ [ φ_xx ψ_xx + φ_yy ψ_yy + ν(φ_xx ψ_yy + φ_yy ψ_xx) + 2(1-ν) φ_xy ψ_xy ]
     for m in range(M):
         for n in range(N):
             I = idx(m, n)
@@ -242,7 +224,6 @@ def ritz_solve_patch(M, N, bc_x1="SS", bc_x2="SS"):
         "f0y": f0y, "f1y": f1y, "f2y": f2y,
     }
     return W, basis_info
-
 
 # ============================================================
 # 5) Postprocessing on a grid
@@ -280,7 +261,6 @@ def eval_fields_on_grid(W, basis_info, x, y):
     svm    = np.sqrt(sigma1**2 - sigma1*sigma2 + sigma2**2 + 3.0*tau12**2)
 
     return {"w": w, "sigma1": sigma1, "sigma2": sigma2, "tau12": tau12, "svm": svm}
-
 
 def bilinear_center(field, x, y):
     xc, yc = a/2.0, b/2.0
@@ -324,9 +304,8 @@ def print_results(tag, out):
     print(f"max |tau12|  = {t12max/1e6:.3f} MPa (value={t12val/1e6:.3f} MPa) at (x1,x2)=({t12loc[0]:.4f},{t12loc[1]:.4f}) m")
     print(f"max von Mises = {vmmax/1e6:.3f} MPa at (x1,x2)=({vmloc[0]:.4f},{vmloc[1]:.4f}) m")
 
-
 # ============================================================
-# 6) Solve cases and plot ONLY required fields
+# 6) Solve cases and plot required fields
 # ============================================================
 print("Solving A.5 with Rayleigh–Ritz (energy method) ...")
 print(f"Using M=N={M}, nqx={nqx}, nqy={nqy}, plot grid={nx}x{ny}")
@@ -335,13 +314,12 @@ print(f"Using M=N={M}, nqx={nqx}, nqy={nqy}, plot grid={nx}x{ny}")
 W_ssss, info_ssss = ritz_solve_patch(M, N, bc_x1="SS", bc_x2="SS")
 out_ssss = eval_fields_on_grid(W_ssss, info_ssss, xg, yg)
 
-# Case 2: CCSS (more appropriate)
+# Case 2: CCSS
 W_ccss, info_ccss = ritz_solve_patch(M, N, bc_x1="CC", bc_x2="SS")
 out_ccss = eval_fields_on_grid(W_ccss, info_ccss, xg, yg)
 
 print_results("Rayleigh–Ritz (SSSS)", out_ssss)
 print_results("Rayleigh–Ritz (CCSS) [clamped x1, SS x2]", out_ccss)
-
 
 # ONLY required plots
 def plot_field(field, title, cbar_label, scale=1.0):
@@ -359,5 +337,36 @@ plot_field(out_ssss["w"], f"Deflection w – Rayleigh–Ritz (SSSS), M=N={M}", "
 plot_field(out_ccss["w"], f"Deflection w – Rayleigh–Ritz (CCSS), M=N={M}", "w [mm]", scale=1e3)
 
 # von Mises (MPa)
-plot_field(out_ssss["svm"], r"$\sigma_{vM}$ [MPa]", scale=1e-6)
-plot_field(out_ccss["svm"], r"$\sigma_{vM}$ [MPa]", scale=1e-6)
+plot_field(out_ssss["svm"], r"$\sigma_{vM}$ [MPa]", r"$\sigma_{vM}$ [MPa]", scale=1e-6)
+plot_field(out_ccss["svm"], r"$\sigma_{vM}$ [MPa]", r"$\sigma_{vM}$ [MPa]", scale=1e-6)
+
+# ============================================================
+# 7) EXTRA: CCSS von Mises plot styled like example (black X at maximum + legend)
+# ============================================================
+def plot_von_mises_ccss_like_example(out, title_text):
+    svm_mpa = out["svm"] * 1e-6  # Pa -> MPa
+    vmmax_pa, (x_max, y_max) = max_with_location(out["svm"], xg, yg)
+
+    plt.figure(figsize=(8, 5))
+    cs = plt.contourf(Xg, Yg, svm_mpa, levels=40)
+
+    plt.scatter(
+        [x_max], [y_max],
+        marker="x", s=70, color="black", linewidths=2,
+        label="Max von Mises", zorder=5
+    )
+
+    cbar = plt.colorbar(cs)
+    cbar.set_label("von Mises stress [MPa]")
+
+    plt.xlabel(r"$x_1$ [m]")
+    plt.ylabel(r"$x_2$ [m]")
+    plt.title(title_text)
+    plt.legend(loc="upper right")
+    plt.tight_layout()
+    plt.show()
+
+plot_von_mises_ccss_like_example(
+    out_ccss,
+    "Distribution of von Mises stress on plate surface"
+)
