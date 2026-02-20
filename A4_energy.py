@@ -31,12 +31,12 @@ D  = E * t**3 / (12.0*(1.0-nu**2))
 z = t/2
 
 # Truncation (choose reasonable; you can increase if needed)
-M = 2
-N = 2
+M = 20
+N = 20
 
 # Plot grid
-nx = 101
-ny = 101
+nx = 201
+ny = 201
 xg = np.linspace(0.0, a, nx)
 yg = np.linspace(0.0, b, ny)
 
@@ -93,7 +93,7 @@ def gauss_legendre(n, L):
 # ============================================================
 # 3) Rayleigh–Ritz solver (energy method)
 # ============================================================
-def ritz_solve(M, N, bc_x1="SS", bc_x2="SS", nqx=30, nqy=30):
+def ritz_solve(M, N, bc_x1="SS", bc_x2="SS", nqx=3*M, nqy=3*N):
     """
     Solve for Wmn in w(x1,x2)=sum_m sum_n Wmn X_m1(x1) X_n2(x2)
     using total potential energy (bending energy + load potential).
@@ -409,4 +409,3 @@ plt.title(f"von Mises – Rayleigh–Ritz (CCSS), M=N={M}")
 plt.tight_layout()
 plt.show()
 
-print(W_ccss)
