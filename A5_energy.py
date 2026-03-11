@@ -48,8 +48,8 @@ xL1, xL2 = x1c - patch_x/2.0, x1c + patch_x/2.0
 yL1, yL2 = x2c - patch_y/2.0, x2c + patch_y/2.0
 
 # Truncation (start moderate; increase if needed)
-M = 15
-N = 15
+M = 20
+N = 20
 
 # Quadrature for ENERGY integrals over whole plate
 # Rule of thumb: >= 2*M and 2*N; for stresses, 3x is safer
