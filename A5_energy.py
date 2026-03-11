@@ -361,3 +361,6 @@ plot_field(out_ccss["w"], f"Deflection w – Rayleigh–Ritz (CCSS), M=N={M}", "
 # von Mises (MPa)
 plot_field(out_ssss["svm"], r"$\sigma_{vM}$ [MPa]", scale=1e-6)
 plot_field(out_ccss["svm"], r"$\sigma_{vM}$ [MPa]", scale=1e-6)
+
+
+

@@ -453,3 +453,82 @@ plt.title(f"von Mises on top surface using (M,N)=({M_use},{N_use})")
 plt.tight_layout()
 plt.show()
 
+# -----------------------------
+# 8) 3D plot of plate deflection
+# -----------------------------
+def compute_w_field(Mmax, Nmax, nx_, ny_):
+    D = plate_rigidity(E, nu, t)
+    x1 = np.linspace(0.0, a, nx_)
+    x2 = np.linspace(0.0, b, ny_)
+    w = np.zeros((ny_, nx_))
+
+    sin_mx1 = {m: np.sin(m * np.pi * x1 / a) for m in range(1, Mmax + 1)}
+    sin_nx2 = {n: np.sin(n * np.pi * x2 / b) for n in range(1, Nmax + 1)}
+
+    for m in range(1, Mmax + 1):
+        for n in range(1, Nmax + 1):
+            P = Pmn_uniform(p0, m, n)
+            if P == 0.0:
+                continue
+
+            W = Wmn_from_Pmn(P, D, a, b, m, n)
+            w += W * np.outer(sin_nx2[n], sin_mx1[m])
+
+    return x1, x2, w
+
+
+x1_w, x2_w, w = compute_w_field(M_use, N_use, nx, ny)
+X1_w, X2_w = np.meshgrid(x1_w, x2_w)
+
+fig = plt.figure(figsize=(10, 6))
+ax = fig.add_subplot(111, projection="3d")
+
+surf = ax.plot_surface(
+    X1_w, X2_w, w * 1000.0,
+    cmap="viridis",
+    edgecolor="k",
+    linewidth=0.2,
+    antialiased=True
+)
+
+cbar = fig.colorbar(surf, shrink=0.65, aspect=12)
+cbar.set_label("Deflection w [mm]")
+
+ax.set_xlabel(r"$x_1$ [m]")
+ax.set_ylabel(r"$x_2$ [m]")
+ax.set_zlabel(r"$w$ [mm]")
+ax.set_title(f"3D deflection of simply supported plate using (M,N)=({M_use},{N_use})")
+ax.view_init(elev=28, azim=225)
+
+plt.tight_layout()
+plt.show()
+
+
+# -----------------------------
+# 9) 3D plot of von Mises stress
+# -----------------------------
+x1, x2, sigma1, sigma2, tau12, svm = compute_stress_fields(M_use, N_use, nx, ny)
+X1, X2 = np.meshgrid(x1, x2)
+
+fig = plt.figure(figsize=(10, 6))
+ax = fig.add_subplot(111, projection="3d")
+
+surf = ax.plot_surface(
+    X1, X2, svm / 1e6,
+    cmap="plasma",
+    edgecolor="k",
+    linewidth=0.2,
+    antialiased=True
+)
+
+cbar = fig.colorbar(surf, shrink=0.65, aspect=12)
+cbar.set_label("von Mises [MPa]")
+
+ax.set_xlabel(r"$x_1$ [m]")
+ax.set_ylabel(r"$x_2$ [m]")
+ax.set_zlabel(r"$\sigma_{vM}$ [MPa]")
+ax.set_title(f"3D von Mises stress on top surface using (M,N)=({M_use},{N_use})")
+ax.view_init(elev=28, azim=225)
+
+plt.tight_layout()
+plt.show()

@@ -206,3 +206,87 @@ if Mconv is not None:
 ax.view_init(elev=30, azim=220)
 plt.tight_layout()
 plt.show()
+
+
+# -----------------------------
+# 7) Compute deflection field using converged (M,N)
+# -----------------------------
+def compute_w_field(Mmax, Nmax, only_odd=False):
+    x1 = np.linspace(0.0, a, nx)
+    x2 = np.linspace(0.0, b, ny)
+    w = np.zeros((ny, nx))
+
+    if only_odd:
+        m_list = range(1, Mmax+1, 2)
+        n_list = range(1, Nmax+1, 2)
+    else:
+        m_list = range(1, Mmax+1)
+        n_list = range(1, Nmax+1)
+
+    sin_m = {m: np.sin(m*np.pi*x1/a) for m in m_list}
+    sin_n = {n: np.sin(n*np.pi*x2/b) for n in n_list}
+
+    for m in m_list:
+        for n in n_list:
+            w += Wmn(m, n) * np.outer(sin_n[n], sin_m[m])
+
+    return x1, x2, w
+
+
+M_use = Mconv if Mconv is not None else M_max
+N_use = Nconv if Nconv is not None else N_max
+
+x1, x2, w = compute_w_field(M_use, N_use, only_odd=ONLY_ODD)
+X1, X2 = np.meshgrid(x1, x2)
+
+
+# -----------------------------
+# 8) 3D deflection plot (with mesh)
+# -----------------------------
+fig = plt.figure(figsize=(10,6))
+ax = fig.add_subplot(111, projection="3d")
+
+surf = ax.plot_surface(
+    X1, X2, w*1e3,
+    cmap="viridis",
+    edgecolor="k",
+    linewidth=0.2,
+    antialiased=True
+)
+
+cbar = fig.colorbar(surf, shrink=0.65, aspect=12)
+cbar.set_label("Deflection w [mm]")
+
+ax.set_xlabel(r"$x_1$ [m]")
+ax.set_ylabel(r"$x_2$ [m]")
+ax.set_zlabel(r"$w$ [mm]")
+ax.set_title(f"3D deflection – patch load (M,N)=({M_use},{N_use})")
+ax.view_init(elev=28, azim=225)
+
+plt.tight_layout()
+plt.show()
+
+
+# -----------------------------
+# 9) 3D deflection plot (clean – better for report)
+# -----------------------------
+fig = plt.figure(figsize=(10,6))
+ax = fig.add_subplot(111, projection="3d")
+
+surf = ax.plot_surface(
+    X1, X2, w*1e3,
+    cmap="viridis",
+    edgecolor="none"
+)
+
+cbar = fig.colorbar(surf, shrink=0.65, aspect=12)
+cbar.set_label("Deflection w [mm]")
+
+ax.set_xlabel(r"$x_1$ [m]")
+ax.set_ylabel(r"$x_2$ [m]")
+ax.set_zlabel(r"$w$ [mm]")
+ax.set_title("Deflection of plate under patch load")
+ax.view_init(elev=28, azim=225)
+
+plt.tight_layout()
+plt.show()

@@ -365,6 +365,13 @@ print_results("Rayleigh–Ritz (SSSS)", ritz_ssss)
 print_results("Rayleigh–Ritz (CCSS) [clamped x1, SS x2]", ritz_ccss)
 
 
+def max_point(field, x, y):
+    """Returnerer (x_max, y_max, val_max) for felt med form (ny,nx)."""
+    iy, ix = np.unravel_index(np.argmax(field), field.shape)
+    return float(x[ix]), float(y[iy]), float(field[iy, ix])
+
+
+
 # ============================================================
 # 8) ONLY required plots: deflections + von Mises
 #    (Navier SSSS and Ritz CCSS shown)
@@ -390,22 +397,144 @@ plt.title(f"Deflection w – Rayleigh–Ritz (CCSS), M=N={M}")
 plt.tight_layout()
 plt.show()
 
+
 # von Mises plots
 plt.figure(figsize=(8, 5))
 cs = plt.contourf(X, Y, nav["svm"]/1e6, levels=40)
 plt.colorbar(cs, label=r"$\sigma_{vM}$ [MPa]")
+xvm, yvm, _ = max_point(nav["svm"], xg, yg)
+plt.scatter([xvm], [yvm], marker="x", s=120, color="black", linewidths=2, label="Max von Mises")
 plt.xlabel(r"$x_1$ [m]")
 plt.ylabel(r"$x_2$ [m]")
 plt.title(f"von Mises – Navier (SSSS), M=N={M}")
+plt.legend()
 plt.tight_layout()
 plt.show()
 
 plt.figure(figsize=(8, 5))
 cs = plt.contourf(X, Y, ritz_ccss["svm"]/1e6, levels=40)
 plt.colorbar(cs, label=r"$\sigma_{vM}$ [MPa]")
+xvm, yvm, _ = max_point(ritz_ccss["svm"], xg, yg)
+plt.scatter([xvm], [yvm], marker="x", s=120, color="black", linewidths=2, label="Max von Mises")
 plt.xlabel(r"$x_1$ [m]")
 plt.ylabel(r"$x_2$ [m]")
 plt.title(f"von Mises – Rayleigh–Ritz (CCSS), M=N={M}")
+plt.legend()
 plt.tight_layout()
 plt.show()
 
+
+# ============================================================
+# 9) 3D plots: deflection + von Mises
+#    (Navier SSSS and Ritz CCSS shown)
+# ============================================================
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+X, Y = np.meshgrid(xg, yg)
+
+# -----------------------------
+# 3D deflection – Navier (SSSS)
+# -----------------------------
+fig = plt.figure(figsize=(10, 6))
+ax = fig.add_subplot(111, projection="3d")
+
+surf = ax.plot_surface(
+    X, Y, nav["w"] * 1e3,
+    cmap="viridis",
+    edgecolor="k",
+    linewidth=0.15,
+    antialiased=True
+)
+
+cbar = fig.colorbar(surf, shrink=0.65, aspect=12)
+cbar.set_label("w [mm]")
+
+ax.set_xlabel(r"$x_1$ [m]")
+ax.set_ylabel(r"$x_2$ [m]")
+ax.set_zlabel(r"$w$ [mm]")
+ax.set_title(f"3D deflection – Navier (SSSS), M=N={M}")
+ax.view_init(elev=28, azim=225)
+
+plt.tight_layout()
+plt.show()
+
+
+# -----------------------------
+# 3D deflection – Ritz (CCSS)
+# -----------------------------
+fig = plt.figure(figsize=(10, 6))
+ax = fig.add_subplot(111, projection="3d")
+
+surf = ax.plot_surface(
+    X, Y, ritz_ccss["w"] * 1e3,
+    cmap="viridis",
+    edgecolor="k",
+    linewidth=0.15,
+    antialiased=True
+)
+
+cbar = fig.colorbar(surf, shrink=0.65, aspect=12)
+cbar.set_label("w [mm]")
+
+ax.set_xlabel(r"$x_1$ [m]")
+ax.set_ylabel(r"$x_2$ [m]")
+ax.set_zlabel(r"$w$ [mm]")
+ax.set_title(f"3D deflection – Rayleigh–Ritz (CCSS), M=N={M}")
+ax.view_init(elev=28, azim=225)
+
+plt.tight_layout()
+plt.show()
+
+
+# -----------------------------
+# 3D von Mises – Navier (SSSS)
+# -----------------------------
+fig = plt.figure(figsize=(10, 6))
+ax = fig.add_subplot(111, projection="3d")
+
+surf = ax.plot_surface(
+    X, Y, nav["svm"] / 1e6,
+    cmap="plasma",
+    edgecolor="k",
+    linewidth=0.15,
+    antialiased=True
+)
+
+cbar = fig.colorbar(surf, shrink=0.65, aspect=12)
+cbar.set_label(r"$\sigma_{vM}$ [MPa]")
+
+ax.set_xlabel(r"$x_1$ [m]")
+ax.set_ylabel(r"$x_2$ [m]")
+ax.set_zlabel(r"$\sigma_{vM}$ [MPa]")
+ax.set_title(f"3D von Mises – Navier (SSSS), M=N={M}")
+ax.view_init(elev=28, azim=225)
+
+plt.tight_layout()
+plt.show()
+
+
+# -----------------------------
+# 3D von Mises – Ritz (CCSS)
+# -----------------------------
+fig = plt.figure(figsize=(10, 6))
+ax = fig.add_subplot(111, projection="3d")
+
+surf = ax.plot_surface(
+    X, Y, ritz_ccss["svm"] / 1e6,
+    cmap="plasma",
+    edgecolor="k",
+    linewidth=0.15,
+    antialiased=True
+)
+
+cbar = fig.colorbar(surf, shrink=0.65, aspect=12)
+cbar.set_label(r"$\sigma_{vM}$ [MPa]")
+
+ax.set_xlabel(r"$x_1$ [m]")
+ax.set_ylabel(r"$x_2$ [m]")
+ax.set_zlabel(r"$\sigma_{vM}$ [MPa]")
+ax.set_title(f"3D von Mises – Rayleigh–Ritz (CCSS), M=N={M}")
+ax.view_init(elev=28, azim=225)
+
+plt.tight_layout()
+plt.show()
