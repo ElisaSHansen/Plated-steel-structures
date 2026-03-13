@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 # 1) Inputs (A5)
 # -----------------------------
 P_total = 20e3       # N (total force)
-a = 2.8              # m
+a = 2.8 *2             # m
 b = 0.67             # m
 
 # Patch dimensions (u along x1, v along x2)
@@ -46,8 +46,8 @@ ONLY_ODD = False
 # -----------------------------
 # 2) Convergence settings (STRESSES)
 # -----------------------------
-M_limit = 50         # scan up to this M
-N_limit = 50         # scan up to this N
+M_limit = 61         # scan up to this M
+N_limit = 61         # scan up to this N
 rel_tol = 1e-4       # relative error vs reference at (M_limit, N_limit)
 
 # Grid used to evaluate maxima during convergence scan (trade speed/accuracy)

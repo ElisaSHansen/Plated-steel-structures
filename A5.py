@@ -21,7 +21,7 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 # 1) INPUT (A5 – patch load in center)
 # -----------------------------
 P_total = 20000.0       # N (20 kN total force)
-a = 2.8                # m
+a = 2.8 *2               # m
 b = 0.67               # m
 
 # Patch dimensions (u along x1, v along x2)
@@ -37,8 +37,8 @@ xi1 = a / 2.0
 xi2 = b / 2.0
 
 # Convergence settings
-M_max = 20
-N_max = 20
+M_max = 41
+N_max = 21
 tol = 1e-4
 
 # Field grid for evaluating max deflection

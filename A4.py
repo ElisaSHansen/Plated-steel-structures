@@ -19,7 +19,7 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 # 1) INPUT: Plate and material
 # -----------------------------
 p0 = 10e3          # Uniform pressure [N/m^2] = 10 kN/m^2
-a  = 2.8           # [m]
+a  = 2.8*2           # [m]
 b  = 0.67          # [m]
 t  = 0.0065        # [m]
 E  = 210e9         # [Pa]
@@ -30,8 +30,8 @@ nx = 81
 ny = 81
 
 # Limits for the convergence surface axes
-M_limit = 20
-N_limit = 20
+M_limit = 31
+N_limit = 31
 
 # Convergence tolerance (e.g. 1e-3 = 0.1%)
 rel_tol = 1e-4
@@ -231,7 +231,7 @@ plt.show()
 # 1) Inputs
 # -----------------------------
 p0 = 10e3          # N/m^2
-a  = 2.8           # m
+a  = 2.8  *2         # m
 b  = 0.67          # m
 t  = 0.0065        # m
 E  = 210e9         # Pa
@@ -479,6 +479,13 @@ def compute_w_field(Mmax, Nmax, nx_, ny_):
 
 x1_w, x2_w, w = compute_w_field(M_use, N_use, nx, ny)
 X1_w, X2_w = np.meshgrid(x1_w, x2_w)
+
+idx_w = np.unravel_index(np.argmax(np.abs(w)), w.shape)
+w_max = np.abs(w[idx_w])
+x1_max = x1_w[idx_w[1]]
+x2_max = x2_w[idx_w[0]]
+
+print(f"Maximum deflection = {w_max*1000:.3f} mm at (x1,x2)=({x1_max:.4f}, {x2_max:.4f}) m")
 
 fig = plt.figure(figsize=(10, 6))
 ax = fig.add_subplot(111, projection="3d")

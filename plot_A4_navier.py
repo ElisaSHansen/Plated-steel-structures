@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 # 1) INPUT: Plate and material
 # -----------------------------
 p0 = 10e3          # Uniform pressure [N/m^2] = 10 kN/m^2
-a  = 2.8           # [m]
+a  = 2.8*2           # [m]
 b  = 0.67          # [m]
 t  = 0.0065        # [m]
 E  = 210e9         # [Pa]
@@ -31,8 +31,8 @@ nx = 81
 ny = 81
 
 # Limits for convergence scan
-M_limit = 20
-N_limit = 20
+M_limit = 31
+N_limit = 31
 
 # Convergence tolerance (relative error vs reference)
 rel_tol = 1e-4
